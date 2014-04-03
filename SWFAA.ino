@@ -32,6 +32,13 @@ long _encLiftPos;
 bool _led01HIGH;
 bool _led02HIGH;
 
+bool _useLiftEncoder;
+int _liftEncMax = 50;
+int _liftEncMin = 0;
+int _liftEncGoal = 37;
+
+bool _chinupMode;
+
 // PUBLIC CONSTANT VALUES
 // Enable/Disable Serial Output
 const bool _serial = true;
@@ -154,6 +161,9 @@ void setup()
 
 	_controllerConnected = false;
 	_watchdogInitialized = false;
+
+	_useLiftEncoder = false;
+	_chinupMode = false;
 
 	//intake1.attach(_intake1);
 	//intake2.attach(_intake2);
@@ -323,6 +333,22 @@ void readController()
       		if (Xbox.Xbox360Connected[i]) 
       		{
       			_controllerConnected = true;
+
+      			//Pressing this button will reset lift and toggle into encoder mode.
+      			if (Xbox.getButtonClick(B, i)) 
+      			{
+      				_useLiftEncoder = !_useLiftEncoder;
+      				//Reset to zero (makes the assumption that lift is all the way down.)
+      				if(_useLiftEncoder)
+      				{
+      					encLift.write(0);
+      				}
+      			}
+
+      			if (Xbox.getButtonClick(Y, i)) 
+      			{
+      				_chinupMode = !_chinupMode;
+      			}
       			
       			//Left Hat Y Axis
       			if (Xbox.getAnalogHat(LeftHatY, i) > 7500 || Xbox.getAnalogHat(LeftHatY, i) < -7500) {
@@ -714,21 +740,89 @@ void autoRedGoal()
  void LiftSpeed(float liftSpeed)
  {
  	//Serial.println(liftSpeed);
- 	/*
- 	if(_encLiftPos <= -40 && liftSpeed > 0)
+ 	if(_useLiftEncoder)
  	{
- 		md1.setM1Brake(400);
-		md1.setM2Brake(400);
+	 	if(_chinupMode)
+	 	{
+	 		if(_encLiftPos >= _liftEncMax  && liftSpeed > 0)
+		 	{
+		 		md1.setM1Brake(400);
+				md1.setM2Brake(400);
+		 	}
+		 	else if(_encLiftPos <= (_liftEncMin+5) && liftSpeed < 0)
+			{
+				md1.setM1Brake(400);
+				md1.setM2Brake(400);
+			}
+			else
+			{
+			 	//Set Lift Speed, Brake if Zero
+				if(liftSpeed > -25 && liftSpeed < 25)
+				{
+					md2.setM2Brake(400);
+				}
+				else
+				{
+					if(_encLiftPos > 40 || _encLiftPos < 5)
+					{
+						liftSpeed = liftSpeed * .25;
+					}
+					else if(_encLiftPos > 30 || _encLiftPos < 10)
+					{
+						liftSpeed = liftSpeed * .50;
+					}
+					else if(_encLiftPos > 20 || _encLiftPos < 15)
+					{
+						liftSpeed = liftSpeed * .75;
+					}
+
+					md2.setM2Speed(liftSpeed);
+				}
+			}
+	 	}
+	 	else
+	 	{
+	 		if(_encLiftPos >= _liftEncGoal  && liftSpeed > 0)
+		 	{
+		 		md1.setM1Brake(400);
+				md1.setM2Brake(400);
+		 	}
+		 	else if(_encLiftPos <= (_liftEncMin+5) && liftSpeed < 0)
+			{
+				md1.setM1Brake(400);
+				md1.setM2Brake(400);
+			}
+			else
+			{
+			 	//Set Lift Speed, Brake if Zero
+				if(liftSpeed > -25 && liftSpeed < 25)
+				{
+					md2.setM2Brake(400);
+				}
+				else
+				{
+					if(_encLiftPos > 40 || _encLiftPos < 5)
+					{
+						liftSpeed = liftSpeed * .25;
+					}
+					else if(_encLiftPos > 30 || _encLiftPos < 10)
+					{
+						liftSpeed = liftSpeed * .50;
+					}
+					else if(_encLiftPos > 20 || _encLiftPos < 15)
+					{
+						liftSpeed = liftSpeed * .75;
+					}
+
+					md2.setM2Speed(liftSpeed);
+				}
+			}
+ 		}
  	}
- 	else if(_encLiftPos >= -5 && liftSpeed > 0)
-	{
-		md1.setM1Brake(400);
-		md1.setM2Brake(400);
-	}
-	else
-	{*/
-	 	//Set Lift Speed, Brake if Zero
-		if(liftSpeed >= -10 && liftSpeed < 5)
+ 	else
+ 	{
+ 		//Set Lift Speed, Brake if Zero
+		if(liftSpeed > -25 && liftSpeed < 25)
 		{
 			md2.setM2Brake(400);
 		}
@@ -736,7 +830,9 @@ void autoRedGoal()
 		{
 			md2.setM2Speed(liftSpeed);
 		}
-	/*}*/
+ 	}
+ 	
+ 	
 	//Serial.println(liftSpeed);
  }
 
