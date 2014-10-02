@@ -2,11 +2,10 @@
 #include <XBOXRECV.h>
 #include <DualVNH5019MotorShield.h>
 #include <SimpleTimer.h>
-#include <Servo.h>
 
 #include <Encoder.h>
 
-#include <avr/wdt.h>
+
 
 //#ifdef dobogusinclude
 //#include <spi4teensy3.h>
@@ -35,9 +34,11 @@ bool _led02HIGH;
 bool _useLiftEncoder;
 int _liftEncMax = 50;
 int _liftEncMin = 0;
-int _liftEncGoal = 37;
+int _liftEncGoal = 41;
 
 bool _chinupMode;
+bool _liftBraked;
+bool _throttlePrecision;
 
 // PUBLIC CONSTANT VALUES
 // Enable/Disable Serial Output
@@ -79,12 +80,15 @@ const int _encRightDig = 35;
 const int _encLiftInt = 20;
 const int _encLiftDig = 37;
 
+//Lift Brake
+//const int _liftBrake = 34;
+
 //LED Pinouts
 const int _led01 = 41;
 const int _led02 = 43;
 
 //RESET Digital Pin
-const int _resetPin = 6;
+const int _watchDogPat = 6;
 
 //USB Pinouts
 //Are Static in Library
@@ -126,6 +130,9 @@ Encoder encLeft(_encLeftInt, _encLeftDig);
 Encoder encRight(_encRightInt, _encRightDig);
 Encoder encLift(_encLiftInt, _encLiftDig);
 
+//Servo
+//Servo brake;
+
 //http://playground.arduino.cc/Code/SimpleTimer
 SimpleTimer timer;
 
@@ -136,8 +143,6 @@ void setup()
 	//wdt_reset();
 	//wdt_disable();
 
-	digitalWrite(_resetPin, HIGH);
-	pinMode(_resetPin, OUTPUT); 
 
 	// assign public state variables
 	_leftSpeed = 0.0;
@@ -161,18 +166,26 @@ void setup()
 
 	_controllerConnected = false;
 	_watchdogInitialized = false;
+	_liftBraked = false;
 
-	_useLiftEncoder = false;
+	_useLiftEncoder = true;
 	_chinupMode = false;
+	_throttlePrecision = true;
 
 	//intake1.attach(_intake1);
 	//intake2.attach(_intake2);
-
+	//brake.attach(_liftBrake);
 	//Set status LED pins to OUTPUTS and set to On
 	pinMode(_led01, OUTPUT);
 	pinMode(_led02, OUTPUT);
 	digitalWrite(_led01, _led01HIGH);
 	digitalWrite(_led01, _led01HIGH);
+
+	//Set Brake Pin To Output
+	/*pinMode(_liftBrake, OUTPUT);
+	digitalWrite(_liftBrake, LOW);*/
+
+	
 
 	if(_serial)
 	{
@@ -233,8 +246,15 @@ void loop()
 	timer.run();
   
 }
+
+uint32_t shutOffRumble;
 void heartBeat()
 {
+	if(shutOffRumble > millis())
+	{
+		Xbox.setRumbleOff();
+		shutOffRumble = 0;
+	}
 	// This gets set to true when the controller intially connects.. No sense in heartbeating if there is not a controller
 	// connected in the first place
 	if(_controllerConnected)
@@ -243,9 +263,14 @@ void heartBeat()
 		{
 			//Start the WatchDog!
 			//Moved the wdt enable to heartbeat because it needs to wait until the USB inits
-			//logMsg("WatchDog Started");
-			//wdt_enable (WDTO_1S);
-			//wdt_reset();
+			Xbox.setRumbleOn(0,255,0);
+			shutOffRumble = millis() + 1000;
+
+			//This pin is attached to UNO watchdog
+			digitalWrite(_watchDogPat, HIGH);
+			pinMode(_watchDogPat, OUTPUT);
+			
+
 			_watchdogInitialized = true;
 		}
 		else
@@ -255,9 +280,7 @@ void heartBeat()
 		  		//_controllerConnected = false;
 		      	Serial.println("XBOX DISCONNECTED (heartbeat)");
 
-		      	Serial.println("resetting");
-				delay(10);
-				digitalWrite(_resetPin, LOW);
+		      
 		      	//osftware_Reset();
 		  		//resetFunc();
 
@@ -265,7 +288,7 @@ void heartBeat()
 		    }
 		    else
 		    {
-		    	wdt_reset();
+		    	digitalWrite(_watchDogPat, _led01HIGH);
 
 				digitalWrite(_led01, _led01HIGH);
 				_led01HIGH = !_led01HIGH;
@@ -334,8 +357,14 @@ void readController()
       		{
       			_controllerConnected = true;
 
+      			//A button
+      			 if (Xbox.getButtonClick(Y, i))
+      			 {
+      			  	_liftBraked = !_liftBraked;
+      			 }
+
       			//Pressing this button will reset lift and toggle into encoder mode.
-      			if (Xbox.getButtonClick(B, i)) 
+      			if (Xbox.getButtonClick(BACK, i)) 
       			{
       				_useLiftEncoder = !_useLiftEncoder;
       				//Reset to zero (makes the assumption that lift is all the way down.)
@@ -345,7 +374,31 @@ void readController()
       				}
       			}
 
-      			if (Xbox.getButtonClick(Y, i)) 
+
+
+      			if (Xbox.getButtonClick(X, i)) 
+      			{
+      				_autoProgNum = 1;
+      				if(_autoProgNum != 0)
+					{
+						if(!_autoRunning)
+						{
+							// Start Program
+							autoStart();
+						} 
+						else 
+						{
+							// Stop Program
+							autoStop();
+						}
+					}
+      			}
+  				if (Xbox.getButtonClick(B, i)) 
+      			{
+      				_throttlePrecision = !_throttlePrecision;
+      			}
+
+      			if (Xbox.getButtonClick(A, i)) 
       			{
       				_chinupMode = !_chinupMode;
       			}
@@ -369,6 +422,19 @@ void readController()
       			{
       				_rightSpeed = 0.0;
       			}
+
+      			//D-PAD Controls 
+      			 if (Xbox.getButtonPress(DOWN, i)) 
+      			 	{
+          				_leftSpeed = -325;
+          				_rightSpeed = -325;
+        			}
+
+    			 if (Xbox.getButtonPress(UP, i)) 
+      			 	{
+          				_leftSpeed = 325;
+          				_rightSpeed = 325;
+        			}
 
       			//Left Hat Click
       			if (Xbox.getButtonClick(L3, i))
@@ -423,19 +489,19 @@ void readController()
 						} 
 						else 
 						{
-							_autoProgNum = 1;
+							_autoProgNum = 0;
 						}
 					} 
 				}
 
 				// Back Button
-				if(Xbox.getButtonClick(BACK, i))
+				/*if(Xbox.getButtonClick(BACK, i))
 				{
 					if(!_autoRunning) 
 					{
 						_autoProgNum = 0;
 					}
-				}
+				}*/
 
 				// XBox Button
 				if(Xbox.getButtonClick(XBOX, i))
@@ -502,7 +568,6 @@ void writeController()
 			    {
 			    	rmbl = 255.0 / 6 * (_totalAmps-4);
 			    }
-			    Xbox.setRumbleOn(0,rmbl,i);
 			}
 			else
 			{
@@ -534,6 +599,16 @@ void writeRobot()
 		LiftSpeed(_liftSpeed);
 		MoveIntake(_intakeDirection);
 		
+		//digitalWrite(_liftBrake, _liftBraked);
+		/*if (_liftBraked) 
+		{
+			brake.write(130);
+		} 
+		else
+		{
+			brake.write(90); 
+		}*/
+
 
 	} 
 	else 
@@ -627,79 +702,165 @@ void autoBlueChin()
 // XBox Button 3
 void autoRedChin()
 {
+	int oneSquare = 2000;
+	int leftSpeed = 300;
+	int rightSpeed = 300;
 	switch(_autoInterval)
 	{
 		case 0:
-			MoveSpeed(200, 200);
+			_useLiftEncoder = false;
+			LiftSpeed(-400);
+			MoveSpeed(leftSpeed, rightSpeed);
+
 			MoveIntake(-1);
 			break;
-
 		
-		case 2300:
-			MoveSpeed(-400, -400);
-			MoveIntake(0);
-			break;
-		
-
-		case 2700:
-			MoveSpeed(-400, 400);
-			break;
-
-		case 3540:
-			MoveSpeed(300, 300);
-			LiftSpeed(-200);
-			break;
-
-		case 4820:
+		case 1000:
 			LiftSpeed(0);
-			MoveIntake(0);
-			break;
-
-		case 5820:
-			LiftSpeed(300);
-			MoveSpeed(400,400);
-			MoveIntake(1);
-			break;
-
-		case 7440:
 			MoveSpeed(0, 0);
-			MoveIntake(0);
+			
+			break;
+
+		case 1100: //first backup
+			MoveSpeed(-leftSpeed, -rightSpeed);
+
+			break;
+
+		case 1700: //1st turn
+			MoveSpeed(leftSpeed, -rightSpeed);
+			break;
+
+		case 1900: //hit second ball
+			MoveSpeed(leftSpeed, rightSpeed);
+			break;
+
+		case 2880: //2nd back up
+			MoveSpeed(-leftSpeed, -rightSpeed);
+			break;	
+
+		case 3580: // 2ndturn
+			MoveSpeed(leftSpeed, -rightSpeed);
+			LiftSpeed(-400);
+			break;
+
+		case 3720: // hit third ball
+			MoveSpeed(leftSpeed, rightSpeed);
 			LiftSpeed(0);
+			break;
+			///////////
+		case 6860: // 3rd back up
+			MoveSpeed(-leftSpeed, -rightSpeed);
+			break;	
+
+		case 7560: // 3rdturn
+			MoveSpeed(leftSpeed, -rightSpeed);
+			LiftSpeed(-400);
+			break;
+
+		case 7620: // hit third ball
+			MoveSpeed(leftSpeed, rightSpeed);
+			LiftSpeed(0);
+			break;
+
+		case 9500: 
+			MoveSpeed(-leftSpeed, rightSpeed);
+
+			break;
+
+		case 10620:
+			MoveSpeed(0,0);
+			LiftSpeed(0);
+			MoveIntake(0);
 			autoStop();
 			break;
-			
+
 	}
 
 }
 //XBox Button 2
 void autoBlueGoal()
 {
-	MoveIntake(1);
-	delay(1000);
-	MoveIntake(-1);
-	delay(1000);
-	MoveIntake(0);
+	switch(_autoInterval) 
+	{
+		case 0:
+			MoveSpeed(200, 200);
+			MoveIntake(1);
+			break;
 
-	autoStop();
+		
+		case 2400:
+			MoveSpeed(-400, -400);
+			MoveIntake(0);
+			break;
+		
+
+		case 2800:
+			MoveSpeed(-400, 400);
+			break;
+
+		case 3640:
+			MoveSpeed(400, 400);
+			LiftSpeed(-200);
+			break;
+
+		case 4100:
+			MoveSpeed(400, 400);
+			LiftSpeed(0);
+			MoveIntake(-1);
+			break;
+
+		case 4980:
+			MoveSpeed(0,0);
+			LiftSpeed(-400);
+			break;
+
+		case 7100:
+			MoveSpeed(400, -400);
+			LiftSpeed(0);
+			break;
+		case 8100:
+			MoveSpeed(0,0);
+			autoStop();
+			break;
+	}
 }
 //XBox Button 1
 void autoRedGoal()
 {
+	
 	switch(_autoInterval)
 	{
 		case 0:
-			MoveSpeed(400,400);
+			_useLiftEncoder = false;
+			_chinupMode = false;
+			MoveSpeed(-200, -200);
 			break;
-		case 200:
-			MoveSpeed(-400, 400);
-			break;
-		case 400:
-			MoveSpeed(400,400);
-			break;
+
 		case 1000:
-			MoveSpeed(0, 0);
-			autoStop();
+			
+			MoveSpeed(-200, -200);
+			LiftSpeed(400);
 			break;
+		
+		case 3000:
+			MoveSpeed(0, 0);
+			break;
+
+		case 5000:
+			LiftSpeed(0);
+			break;
+
+		case 6000:
+			LiftSpeed(400);
+			break;
+		
+		case 9000:
+			MoveSpeed(0, 0);
+			LiftSpeed(0);
+			autoStop();
+			_useLiftEncoder = true;
+			break;
+
 
 
 	}
@@ -717,6 +878,42 @@ void autoRedGoal()
  {
  	
 
+ 	if (_chinupMode)
+ 	{
+ 		float preMax = 150;
+ 		//float rMax = -4 * _encLiftPos + 400;
+
+ 		
+
+ 		leftSpeed = map(_leftSpeed, 0, 400, 0, preMax);
+ 		rightSpeed = map(_rightSpeed, 0, 400, 0, preMax);
+ 	}
+ 	else 
+ 	{
+ 		if(_intakeDirection == 1)
+	 	{
+			float preMax = 300;
+	 		//float rMax = -4 * _encLiftPos + 400;
+
+	 		
+
+	 		leftSpeed = map(_leftSpeed, 0, 400, 0, preMax);
+	 		rightSpeed = map(_rightSpeed, 0, 400, 0, preMax);
+		}
+	 	else
+	 	{
+		 	if(_useLiftEncoder && _throttlePrecision)
+		 	{
+		 		float preMax = -4 * _encLiftPos + 400;
+		 		//float rMax = -4 * _encLiftPos + 400;
+
+		 		
+
+		 		leftSpeed = map(_leftSpeed, 0, 400, 0, preMax);
+		 		rightSpeed = map(_rightSpeed, 0, 400, 0, preMax);
+			}
+		}
+	}
 	//Set Right Speed
 	md1.setM1Speed(-1 * leftSpeed);
 
@@ -744,15 +941,15 @@ void autoRedGoal()
  	{
 	 	if(_chinupMode)
 	 	{
-	 		if(_encLiftPos >= _liftEncMax  && liftSpeed > 0)
+	 		if(_encLiftPos >= _liftEncMax  && liftSpeed < 0)
 		 	{
-		 		md1.setM1Brake(400);
-				md1.setM2Brake(400);
+		 		md2.setM1Brake(400);
+				md2.setM2Brake(400);
 		 	}
-		 	else if(_encLiftPos <= (_liftEncMin+5) && liftSpeed < 0)
+		 	else if(_encLiftPos <= (_liftEncMin+3) && liftSpeed > 0)
 			{
-				md1.setM1Brake(400);
-				md1.setM2Brake(400);
+				md2.setM1Brake(400);
+				md2.setM2Brake(400);
 			}
 			else
 			{
@@ -763,34 +960,34 @@ void autoRedGoal()
 				}
 				else
 				{
-					if(_encLiftPos > 40 || _encLiftPos < 5)
+					if(_encLiftPos > 100 || _encLiftPos < -10)
 					{
-						liftSpeed = liftSpeed * .25;
+						liftSpeed = liftSpeed * .5;
 					}
-					else if(_encLiftPos > 30 || _encLiftPos < 10)
+					else if(_encLiftPos > 100 || _encLiftPos < -10)
 					{
-						liftSpeed = liftSpeed * .50;
+						liftSpeed = liftSpeed * .65;
 					}
-					else if(_encLiftPos > 20 || _encLiftPos < 15)
+					else if(_encLiftPos > 100 || _encLiftPos < -10)
 					{
-						liftSpeed = liftSpeed * .75;
+						liftSpeed = liftSpeed * .85;
 					}
-
+					//Serial.println(liftSpeed);
 					md2.setM2Speed(liftSpeed);
 				}
 			}
 	 	}
 	 	else
 	 	{
-	 		if(_encLiftPos >= _liftEncGoal  && liftSpeed > 0)
+	 		if(_encLiftPos >= _liftEncGoal  && liftSpeed < 0)
 		 	{
-		 		md1.setM1Brake(400);
-				md1.setM2Brake(400);
+		 		md2.setM1Brake(400);
+				md2.setM2Brake(400);
 		 	}
-		 	else if(_encLiftPos <= (_liftEncMin+5) && liftSpeed < 0)
+		 	else if(_encLiftPos <= (_liftEncMin+3) && liftSpeed > 0)
 			{
-				md1.setM1Brake(400);
-				md1.setM2Brake(400);
+				md2.setM1Brake(400);
+				md2.setM2Brake(400);
 			}
 			else
 			{
@@ -801,18 +998,19 @@ void autoRedGoal()
 				}
 				else
 				{
-					if(_encLiftPos > 40 || _encLiftPos < 5)
+					if(_encLiftPos > 100 || _encLiftPos < 5)
 					{
-						liftSpeed = liftSpeed * .25;
+						liftSpeed = liftSpeed * .45;
 					}
-					else if(_encLiftPos > 30 || _encLiftPos < 10)
+					else if(_encLiftPos > 100 || _encLiftPos < 10)
 					{
-						liftSpeed = liftSpeed * .50;
+						liftSpeed = liftSpeed * .65;
 					}
-					else if(_encLiftPos > 20 || _encLiftPos < 15)
+					else if(_encLiftPos > 100 || _encLiftPos < 15)
 					{
-						liftSpeed = liftSpeed * .75;
+						liftSpeed = liftSpeed * .85;
 					}
+					//Serial.println(liftSpeed);
 
 					md2.setM2Speed(liftSpeed);
 				}
@@ -870,12 +1068,12 @@ void autoRedGoal()
 		case 1:
 			//intake1.write(150);
           	//intake2.write(150);
-			md2.setM1Speed(400);
+			md2.setM1Speed(-300);
 			break;
 		case -1:
 			//intake1.write(30);
           	//intake2.write(30);
-			md2.setM1Speed(-400);
+			md2.setM1Speed(300);
 			break;
 		case 0:
 			//intake1.write(90);
