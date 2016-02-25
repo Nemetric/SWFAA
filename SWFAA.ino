@@ -17,6 +17,7 @@ float _rightSpeed;
 float _liftSpeed;
 int _intakeDirection;
 bool _isThrowing; 
+
 bool _steeringReversed;
 
 bool _autoRunning;
@@ -255,8 +256,8 @@ void heartBeat()
 {
 	if(shutOffRumble > millis())
 	{
-		Xbox.setRumbleOff();
-		shutOffRumble = 0;
+		//Xbox.setRumbleOff();
+		//shutOffRumble = 0;
 	}
 	// This gets set to true when the controller intially connects.. No sense in heartbeating if there is not a controller
 	// connected in the first place
@@ -266,8 +267,8 @@ void heartBeat()
 		{
 			//Start the WatchDog!
 			//Moved the wdt enable to heartbeat because it needs to wait until the USB inits
-			Xbox.setRumbleOn(0,255,0);
-			shutOffRumble = millis() + 1000;
+			//Xbox.setRumbleOn(0,255,0);
+			//shutOffRumble = millis() + 1000;
 
 			//This pin is attached to UNO watchdog
 			digitalWrite(_watchDogPat, HIGH);
@@ -570,6 +571,11 @@ void writeController()
 			    if(_totalAmps > 4)
 			    {
 			    	rmbl = 255.0 / 6 * (_totalAmps-4);
+			    	Xbox.setRumbleOn(0,rmbl,0);
+			    }
+			    else
+			    {
+			    	Xbox.setRumbleOff();
 			    }
 			}
 			else
@@ -881,42 +887,11 @@ void autoRedGoal()
  {
  	
 
- 	if (_chinupMode)
- 	{
- 		float preMax = 150;
- 		//float rMax = -4 * _encLiftPos + 400;
+	//float preMax = -4 * _encLiftPos + 400;
+	float preMax = 400;
+	leftSpeed = map(_leftSpeed, 0, 400, 0, preMax);
+	rightSpeed = map(_rightSpeed, 0, 400, 0, preMax);
 
- 		
-
- 		leftSpeed = map(_leftSpeed, 0, 400, 0, preMax);
- 		rightSpeed = map(_rightSpeed, 0, 400, 0, preMax);
- 	}
- 	else 
- 	{
- 		if(_intakeDirection == 1)
-	 	{
-			float preMax = 300;
-	 		//float rMax = -4 * _encLiftPos + 400;
-
-	 		
-
-	 		leftSpeed = map(_leftSpeed, 0, 400, 0, preMax);
-	 		rightSpeed = map(_rightSpeed, 0, 400, 0, preMax);
-		}
-	 	else
-	 	{
-		 	if(_useLiftEncoder && _throttlePrecision)
-		 	{
-		 		float preMax = -4 * _encLiftPos + 400;
-		 		//float rMax = -4 * _encLiftPos + 400;
-
-		 		
-
-		 		leftSpeed = map(_leftSpeed, 0, 400, 0, preMax);
-		 		rightSpeed = map(_rightSpeed, 0, 400, 0, preMax);
-			}
-		}
-	}
 	//Set Right Speed
 	md1.setM1Speed(-1 * leftSpeed);
 
@@ -939,7 +914,11 @@ void autoRedGoal()
 
  void LiftSpeed(float liftSpeed)
  {
+
+ 	md2.setM2Speed(liftSpeed);
+
  	//Serial.println(liftSpeed);
+ 	/*
  	if(_useLiftEncoder)
  	{
 	 	if(_chinupMode)
@@ -1032,6 +1011,7 @@ void autoRedGoal()
 			md2.setM2Speed(liftSpeed);
 		}
  	}
+ 	*/
  	
  	
 	//Serial.println(liftSpeed);
@@ -1071,12 +1051,12 @@ void autoRedGoal()
 		case 1:
 			//intake1.write(150);
           	//intake2.write(150);
-			md2.setM1Speed(-300);
+			md2.setM1Speed(-400);
 			break;
 		case -1:
 			//intake1.write(30);
           	//intake2.write(30);
-			md2.setM1Speed(300);
+			md2.setM1Speed(400);
 			break;
 		case 0:
 			//intake1.write(90);
