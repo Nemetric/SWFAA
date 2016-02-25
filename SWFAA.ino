@@ -363,18 +363,18 @@ void readController()
       			//A button
       			 if (Xbox.getButtonClick(Y, i))
       			 {
-      			  	_liftBraked = !_liftBraked;
+      			  	//_liftBraked = !_liftBraked;
       			 }
 
       			//Pressing this button will reset lift and toggle into encoder mode.
       			if (Xbox.getButtonClick(BACK, i)) 
       			{
-      				_useLiftEncoder = !_useLiftEncoder;
+      				//_useLiftEncoder = !_useLiftEncoder;
       				//Reset to zero (makes the assumption that lift is all the way down.)
-      				if(_useLiftEncoder)
-      				{
-      					encLift.write(0);
-      				}
+      				//if(_useLiftEncoder)
+      				//{
+      				//	encLift.write(0);
+      				//}
       			}
 
 
@@ -398,12 +398,12 @@ void readController()
       			}
   				if (Xbox.getButtonClick(B, i)) 
       			{
-      				_throttlePrecision = !_throttlePrecision;
+      				//_throttlePrecision = !_throttlePrecision;
       			}
 
       			if (Xbox.getButtonClick(A, i)) 
       			{
-      				_chinupMode = !_chinupMode;
+      				//_chinupMode = !_chinupMode;
       			}
       			
       			//Left Hat Y Axis
@@ -429,14 +429,14 @@ void readController()
       			//D-PAD Controls 
       			 if (Xbox.getButtonPress(DOWN, i)) 
       			 	{
-          				_leftSpeed = -325;
-          				_rightSpeed = -325;
+          				//_leftSpeed = -325;
+          				//_rightSpeed = -325;
         			}
 
     			 if (Xbox.getButtonPress(UP, i)) 
       			 	{
-          				_leftSpeed = 325;
-          				_rightSpeed = 325;
+          				//_leftSpeed = 325;
+          				//_rightSpeed = 325;
         			}
 
       			//Left Hat Click
