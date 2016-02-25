@@ -404,6 +404,7 @@ void readController()
 
       			if (Xbox.getButtonClick(A, i)) 
       			{
+      				_steeringReversed = !_steeringReversed;
       				//_chinupMode = !_chinupMode;
       			}
       			
@@ -444,12 +445,13 @@ void readController()
       			if (Xbox.getButtonClick(L3, i))
       			{
       				//Throw();
+      				_steeringReversed = !_steeringReversed;
       			}
 
       			//Right Hat Click
       			if (Xbox.getButtonClick(R3, i))
       			{
-
+      				_steeringReversed = !_steeringReversed;
       			}
 
       			//L2 Trigger
@@ -885,18 +887,27 @@ void autoRedGoal()
 
  void MoveSpeed(float leftSpeed, float rightSpeed)
  {
- 	
+ 	if(_steeringReversed)
+ 	{
+	 	md1.setM1Speed(-1 * leftSpeed);
+	 	md1.setM2Speed(-1 * rightSpeed);
+	 }
+	 else
+	 {
+	 	md1.setM2Speed(leftSpeed);
+	 	md1.setM1Speed(rightSpeed);
+	 }
 
 	//float preMax = -4 * _encLiftPos + 400;
-	float preMax = 400;
-	leftSpeed = map(_leftSpeed, 0, 400, 0, preMax);
-	rightSpeed = map(_rightSpeed, 0, 400, 0, preMax);
+	//float preMax = 400;
+	//leftSpeed = map(_leftSpeed, 0, 400, 0, preMax);
+	//rightSpeed = map(_rightSpeed, 0, 400, 0, preMax);
 
 	//Set Right Speed
-	md1.setM1Speed(-1 * leftSpeed);
+	
 
 	//Set Left Speed
-	md1.setM2Speed(-1 * rightSpeed);
+	
 	//Serial.println(leftSpeed);
 		//Serial.println(_rightSpeed);
 
