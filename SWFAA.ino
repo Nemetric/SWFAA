@@ -17,6 +17,7 @@ float _rightSpeed;
 float _liftSpeed;
 int _intakeDirection;
 bool _isThrowing; 
+bool _steeringReversed;
 
 bool _autoRunning;
 int _autoProgNum;
@@ -171,6 +172,8 @@ void setup()
 	_useLiftEncoder = true;
 	_chinupMode = false;
 	_throttlePrecision = true;
+
+	_steeringReversed = false;
 
 	//intake1.attach(_intake1);
 	//intake2.attach(_intake2);
